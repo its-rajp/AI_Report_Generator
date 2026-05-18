@@ -4,11 +4,18 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-BASE_DIR = Path(__file__).parent.parent
+# On Vercel, only /tmp is writable. Detect Vercel via its environment variable.
+IS_VERCEL = os.environ.get("VERCEL") == "1"
+
+if IS_VERCEL:
+    BASE_DIR = Path("/tmp")
+else:
+    BASE_DIR = Path(__file__).parent.parent
+
 DATA_DIR = BASE_DIR / "data"
-UPLOADS_DIR = DATA_DIR / "uploads"
-PROCESSED_DIR = DATA_DIR / "processed"
-TEMPLATES_DIR = DATA_DIR / "templates"
+UPLOADS_DIR = BASE_DIR / "uploads"
+PROCESSED_DIR = BASE_DIR / "processed"
+TEMPLATES_DIR = BASE_DIR / "templates"
 DB_DIR = BASE_DIR / "db"
 
 # Ensure directories exist

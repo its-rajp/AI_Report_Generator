@@ -40,7 +40,8 @@ const Generate = () => {
     formData.append('service', service);
     formData.append('project_name', projectName);
 
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+    // In production (Vercel), use relative /api path. In local dev, use localhost.
+    const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:8000');
 
     try {
       const response = await fetch(`${API_URL}/generate-report`, {

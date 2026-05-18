@@ -6,7 +6,7 @@ from database import get_db
 from models import Report
 import shutil
 from pathlib import Path
-from config.settings import UPLOADS_DIR
+from config.settings import UPLOADS_DIR, PROCESSED_DIR
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import datetime
@@ -85,7 +85,7 @@ def get_report(report_id: int, db: Session = Depends(get_db)):
 
 @app.get("/download/{filename}")
 def download_report(filename: str):
-    file_path = Path(__file__).parent.parent.parent / "data" / "processed" / filename
+    file_path = PROCESSED_DIR / filename
     if file_path.exists():
         return FileResponse(file_path)
     return {"error": "File not found"}
