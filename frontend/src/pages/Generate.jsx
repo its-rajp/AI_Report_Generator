@@ -40,8 +40,10 @@ const Generate = () => {
     formData.append('service', service);
     formData.append('project_name', projectName);
 
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
     try {
-      const response = await fetch('http://localhost:8000/generate-report', {
+      const response = await fetch(`${API_URL}/generate-report`, {
         method: 'POST',
         body: formData,
       });

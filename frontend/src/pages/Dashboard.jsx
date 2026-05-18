@@ -7,8 +7,9 @@ const Dashboard = () => {
   const [search, setSearch] = useState("");
 
   useEffect(() => {
+    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
     // In a real app, fetch from backend
-    fetch('http://localhost:8000/reports')
+    fetch(`${API_BASE}/reports`)
       .then(res => res.json())
       .then(data => {
         setReports(data.map(r => ({
