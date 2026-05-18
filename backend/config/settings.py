@@ -8,18 +8,22 @@ load_dotenv()
 IS_VERCEL = os.environ.get("VERCEL") == "1"
 
 if IS_VERCEL:
-    BASE_DIR = Path("/tmp")
+    # Vercel: flat structure under /tmp (only writable dir)
+    UPLOADS_DIR = Path("/tmp/uploads")
+    PROCESSED_DIR = Path("/tmp/processed")
+    TEMPLATES_DIR = Path("/tmp/templates")
+    DB_DIR = Path("/tmp/db")
 else:
-    BASE_DIR = Path(__file__).parent.parent
+    # Local: original nested structure under backend/data/
+    _BASE = Path(__file__).parent.parent
+    _DATA = _BASE / "data"
+    UPLOADS_DIR = _DATA / "uploads"
+    PROCESSED_DIR = _DATA / "processed"
+    TEMPLATES_DIR = _DATA / "templates"
+    DB_DIR = _BASE / "db"
 
-DATA_DIR = BASE_DIR / "data"
-UPLOADS_DIR = BASE_DIR / "uploads"
-PROCESSED_DIR = BASE_DIR / "processed"
-TEMPLATES_DIR = BASE_DIR / "templates"
-DB_DIR = BASE_DIR / "db"
-
-# Ensure directories exist
-for directory in [DATA_DIR, UPLOADS_DIR, PROCESSED_DIR, TEMPLATES_DIR, DB_DIR]:
+# Ensure all directories exist at startup
+for directory in [UPLOADS_DIR, PROCESSED_DIR, TEMPLATES_DIR, DB_DIR]:
     directory.mkdir(parents=True, exist_ok=True)
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
