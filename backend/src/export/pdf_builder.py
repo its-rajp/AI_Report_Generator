@@ -74,6 +74,29 @@ class PDFBuilder:
         
         self.heading_style = self.styles['Heading1']
         
+    def _sanitize(self, text: str) -> str:
+        """Strip any HTML tags the AI might emit that ReportLab can't handle,
+        then re-apply only the safe inline tags we control."""
+        # Remove ALL HTML tags first (sub, sup, u, s, span, etc.)
+        text = re.sub(r'<(?!/?b>|/?i>|/?br/?>)[^>]+>', '', text)
+        # Escape bare & characters that aren't already an entity
+        text = re.sub(r'&(?!(?:amp|lt|gt|quot|apos|bull);)', '&amp;', text)
+        # Strip LaTeX-style fragments that can confuse the parser
+        text = re.sub(r'\$[^$]*\$', '', text)
+        return text
+
+    def _safe_paragraph(self, text: str, style) -> Paragraph:
+        """Try to build a Paragraph, fall back to plain-escaped text on failure."""
+        try:
+            return Paragraph(text, style)
+        except Exception:
+            # Strip all markup and try again as completely plain text
+            plain = re.sub(r'<[^>]+>', '', text)
+            try:
+                return Paragraph(plain, style)
+            except Exception:
+                return Paragraph("(content rendering error)", style)
+
     def _parse_markdown(self, text: str, story: list):
         """Parse LLM markdown to ReportLab Paragraphs"""
         lines = text.split('\n')
@@ -82,23 +105,29 @@ class PDFBuilder:
             if not line:
                 story.append(Spacer(1, 6))
                 continue
-                
-            # Inline formatting
-            line = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', line)  # Bold
-            # Be careful with italic so it doesn't break list asterisks
-            line = re.sub(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', r'<i>\1</i>', line) 
             
+            # Apply inline bold/italic BEFORE sanitizing so we keep them
+            line = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', line)
+            line = re.sub(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', r'<i>\1</i>', line)
+            
+            # Now sanitize to remove any AI-generated HTML we can't handle
+            line = self._sanitize(line)
+
             # Block formatting
-            if line.startswith('### '):
-                story.append(Paragraph(line[4:], self.styles['Heading3']))
+            if line.startswith('#### '):
+                story.append(self._safe_paragraph(line[5:], self.styles['Heading4'] if 'Heading4' in self.styles else self.styles['Heading3']))
+            elif line.startswith('### '):
+                story.append(self._safe_paragraph(line[4:], self.styles['Heading3']))
             elif line.startswith('## '):
-                story.append(Paragraph(line[3:], self.styles['Heading2']))
+                story.append(self._safe_paragraph(line[3:], self.styles['Heading2']))
             elif line.startswith('# '):
-                story.append(Paragraph(line[2:], self.styles['Heading1']))
+                story.append(self._safe_paragraph(line[2:], self.styles['Heading1']))
             elif line.startswith('* ') or line.startswith('- '):
-                story.append(Paragraph(f"&bull; {line[2:]}", self.styles['BulletItem']))
+                story.append(self._safe_paragraph(f"&bull; {line[2:]}", self.styles['BulletItem']))
+            elif line.startswith('---') or line.startswith('==='):
+                story.append(Spacer(1, 8))
             else:
-                story.append(Paragraph(line, self.styles['JustifiedBody']))
+                story.append(self._safe_paragraph(line, self.styles['JustifiedBody']))
         
     def build_report(self, content: dict, viz_files: dict, params: dict) -> str:
         project_name = params.get("project_name", "Untitled_Report").replace(" ", "_")

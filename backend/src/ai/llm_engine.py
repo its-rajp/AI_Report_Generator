@@ -169,22 +169,28 @@ Final Takeaways.
 
         prompt = PromptTemplate(
             input_variables=["industry", "service", "data_summary", "structure"],
-            template="""You are a senior {service} expert consulting for the {industry} industry.
+            template="""You are a senior {service} expert writing a formal engineering report for the {industry} industry.
 
-You must write a comprehensive, highly technical engineering/financial report based on the data summary provided.
+The following is a complete data profile of the uploaded CSV file(s). This is the ONLY source of truth. Every section of your report MUST directly reference the actual column names, values, statistics, and findings from this data. Do NOT write generic content — every paragraph must be specific to the data below.
 
-### Data Summary:
+=== UPLOADED DATA PROFILE ===
 {data_summary}
+=== END DATA PROFILE ===
 
-### Required Report Structure:
-You MUST follow this exact structure and formatting. Use Markdown `#` for main sections and `##` or `###` for sub-sections.
+Write a comprehensive, highly technical report that directly analyses the data above. Follow this exact structure:
 {structure}
 
-### Formatting Rules for Mathematical Equations:
-CRITICAL: Do NOT use LaTeX or TeX formatting (`$$`, `\frac`, `\partial`, `\nabla`, `\otimes`, etc.). ReportLab does not support raw LaTeX.
-Instead, write all mathematical formulas, governing equations, and symbols using plain text, standard Unicode symbols, or simple notation (e.g., write "∂ρ/∂t + ∇·(ρu) = 0" or "F = m * a" or "k-epsilon"). You may use standard HTML tags like `<sub>` or `<sup>` if needed.
+CRITICAL RULES:
+1. Reference EXACT column names from the data in every section.
+2. Cite SPECIFIC numerical values (means, ranges, peaks, anomalies) found in the data.
+3. Mention the actual file name(s) in the introduction.
+4. Use Markdown `#` for H1 sections, `##` for H2 sub-sections, `###` for H3 sub-sub-sections, and `* ` for bullet points.
+5. Do NOT use LaTeX or TeX math formatting. Write equations as plain text (e.g., dP/dx, delta_T, k-epsilon model).
+6. Do NOT write introductory filler like "Here is the report". Start directly with the first section heading.
+7. If a CSV column suggests financial data (price, cost, revenue), analyse it as financial data — not as physical simulation data.
+8. Ensure professional grammar, authoritative tone, and a minimum of 600 words.
 
-Ensure perfect grammar, authoritative tone, and professional flow. Use specific engineering/financial terminology appropriate for {service}. Do NOT write introductory filler like "Here is the report". Output ONLY the report text in Markdown.
+Output ONLY the Markdown report text.
 """
         )
 

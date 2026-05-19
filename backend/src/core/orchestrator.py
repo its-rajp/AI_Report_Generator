@@ -36,19 +36,47 @@ class ReportOrchestrator:
                 file_type = Path(file_path).suffix[1:]
                 all_data[file_path] = self.file_parser.parse_file(file_path, file_type)
             
-            # 2. Extract Data Insights
-            data_insights = {}
+            # 2. Build a rich data profile for each uploaded file
+            data_profile_parts = []
             for path, data in all_data.items():
-                if "data" in data and not data["data"].empty:
-                    df = data["data"]
-                    num_df = df.select_dtypes(include=['number'])
-                    if not num_df.empty:
-                        # Get a clean statistical summary of the data
-                        stats = num_df.describe().loc[['mean', 'min', 'max', 'std']].round(2).to_dict()
-                        data_insights[Path(path).name] = stats
-            
-            insights_str = str(data_insights) if data_insights else "No numerical data available for analysis."
-            
+                fname = Path(path).name
+                if "data" not in data or data["data"].empty:
+                    data_profile_parts.append(f"File: {fname}\n  (No tabular data found)")
+                    continue
+
+                df = data["data"]
+                profile_lines = [f"=== File: {fname} ==="]
+                profile_lines.append(f"Rows: {len(df)}  |  Columns: {len(df.columns)}")
+                profile_lines.append(f"Column names: {list(df.columns)}")
+
+                # Sample rows
+                sample = df.head(5).to_string(index=False, max_cols=20)
+                profile_lines.append(f"\nFirst 5 rows:\n{sample}")
+
+                # Numerical stats
+                num_df = df.select_dtypes(include=["number"])
+                if not num_df.empty:
+                    stats = num_df.describe().loc[["mean", "min", "max", "std"]].round(3)
+                    profile_lines.append(f"\nNumerical column statistics:\n{stats.to_string()}")
+
+                # Categorical/text column summaries (top 5 unique values per column)
+                cat_df = df.select_dtypes(exclude=["number"])
+                if not cat_df.empty:
+                    cat_lines = ["\nCategorical/text columns (top values):"]
+                    for col in cat_df.columns:
+                        top = df[col].value_counts().head(5)
+                        cat_lines.append(f"  {col}: {list(top.index)}")
+                    profile_lines.append("\n".join(cat_lines))
+
+                data_profile_parts.append("\n".join(profile_lines))
+
+            data_summary = "\n\n".join(data_profile_parts) if data_profile_parts else "No data found."
+
+            # Truncate to a generous but safe limit for the LLM context
+            data_summary = data_summary[:4000]
+
+            logger.info(f"Data profile built ({len(data_summary)} chars). Sending to LLM...")
+
             # 3. Generate content sections in a single LLM call
             service = params.get("service", "Analysis")
             industry = params.get("industry", "General")
@@ -57,7 +85,7 @@ class ReportOrchestrator:
                 "full_text": self.llm.generate_report_content(
                     service=service,
                     industry=industry,
-                    data_summary=insights_str[:2000] # Provide enough context but cap size
+                    data_summary=data_summary
                 )
             }
             

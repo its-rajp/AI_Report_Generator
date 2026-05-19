@@ -5,6 +5,7 @@ import Landing from './pages/Landing'
 import Dashboard from './pages/Dashboard'
 import Generate from './pages/Generate'
 import ReportView from './pages/ReportView'
+import DataSandbox from './pages/DataSandbox'
 
 function App() {
   return (
@@ -27,6 +28,7 @@ function App() {
           <Route path="/" element={<Landing />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/generate" element={<Generate />} />
+          <Route path="/sandbox" element={<DataSandbox />} />
           <Route path="/report/:id" element={<ReportView />} />
         </Routes>
       </div>

@@ -1,10 +1,13 @@
-from fastapi import FastAPI, UploadFile, File, Form, Depends, BackgroundTasks
+from fastapi import FastAPI, UploadFile, File, Form, Depends, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from src.core.orchestrator import ReportOrchestrator
+from src.core.data_validator import DataValidator
 from database import get_db
 from models import Report
 import shutil
+import tempfile
+import pandas as pd
 from pathlib import Path
 from config.settings import UPLOADS_DIR, PROCESSED_DIR
 from fastapi.responses import FileResponse
@@ -93,3 +96,79 @@ def download_report(filename: str):
 @app.get("/health")
 def health_check():
     return {"status": "healthy"}
+
+
+validator = DataValidator()
+
+@app.post("/validate-files")
+async def validate_files(
+    files: list[UploadFile] = File(...),
+    service: str = Form(...),
+):
+    """
+    Phase 1: Validate uploaded CSVs against service-specific column requirements.
+    Returns per-file validation results without running the full report pipeline.
+    """
+    results = []
+    tmp_paths = []
+    try:
+        for file in files:
+            # Save to temp location for reading
+            suffix = Path(file.filename).suffix
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                shutil.copyfileobj(file.file, tmp)
+                tmp_paths.append(tmp.name)
+            result = validator.validate(tmp_paths[-1], service)
+            result["filename"] = file.filename  # Override with original filename
+            results.append(result)
+    finally:
+        import os
+        for p in tmp_paths:
+            try:
+                os.unlink(p)
+            except Exception:
+                pass
+
+    overall_valid = all(r["valid"] for r in results)
+    return {"overall_valid": overall_valid, "files": results}
+
+
+@app.post("/preview-data")
+async def preview_data(
+    file: UploadFile = File(...),
+):
+    """
+    Phase 2: Return column names and first 100 rows of a CSV for the Data Sandbox.
+    """
+    suffix = Path(file.filename).suffix.lower()
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        shutil.copyfileobj(file.file, tmp)
+        tmp_path = tmp.name
+
+    try:
+        if suffix in [".csv", ".txt"]:
+            df = pd.read_csv(tmp_path, nrows=100)
+        elif suffix in [".xlsx", ".xls"]:
+            df = pd.read_excel(tmp_path, nrows=100)
+        else:
+            raise HTTPException(status_code=422, detail=f"Unsupported file type: {suffix}")
+
+        # Replace NaN with None for clean JSON serialization
+        df = df.where(pd.notnull(df), None)
+        columns = list(df.columns)
+        numeric_columns = df.select_dtypes(include=["number"]).columns.tolist()
+        rows = df.to_dict(orient="records")
+
+        return {
+            "filename": file.filename,
+            "columns": columns,
+            "numeric_columns": numeric_columns,
+            "row_count": len(rows),
+            "rows": rows
+        }
+    finally:
+        import os
+        try:
+            os.unlink(tmp_path)
+        except Exception:
+            pass
